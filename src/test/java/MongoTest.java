@@ -89,4 +89,14 @@ public class MongoTest {
         // get field
         System.out.println(student.get( "section" ));
     }
+
+    @Test
+    public void TestEditing(){
+        MongoCollection<Document> collection = database.getCollection( "school_student" );
+    }
+
+
+
+
+
 }

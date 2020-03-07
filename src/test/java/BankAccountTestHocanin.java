@@ -11,10 +11,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import utilities.BaseTest;
 
+import static com.mongodb.client.model.Filters.eq;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
-public class BankAccountTest extends BaseTest {
+public class BankAccountTestHocanin extends BaseTest {
     private String apiPath = "/school-service/api/bank-accounts";
     private MongoDatabase database;
     private MongoCollection<Document> collection;
@@ -28,11 +29,6 @@ public class BankAccountTest extends BaseTest {
 
     @Test
     public void createTest() {
-
-        collection = database.getCollection("school_bank_account");
-        long initialCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
         BankAccount model = getBody();
 
         // creating entity
@@ -58,16 +54,6 @@ public class BankAccountTest extends BaseTest {
         Assert.assertEquals(entity.get( "currency" ), model.getCurrency());
         Assert.assertEquals(entity.get( "currency" ), model.getCurrency());
 
-        collection = database.getCollection("school_bank_account");
-        long afterCreationCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
-        Assert.assertEquals(afterCreationCount - 1,initialCount);
-        Assert.assertEquals(initialCount + 1,afterCreationCount);
-
-
-
-
         // deleting entity
         given()
                 .cookies( cookies )
@@ -92,7 +78,6 @@ public class BankAccountTest extends BaseTest {
 
     @Test
     public void editTest() {
-
         BankAccount model = getBody();
 
         // creating model
@@ -147,11 +132,9 @@ public class BankAccountTest extends BaseTest {
     @Test
     public void createNegativeTest() {
         BankAccount entity = getBody();
-
-        collection = database.getCollection("school_bank_account");
-        long DefaultCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
+        // get the document count
+        collection = database.getCollection( "school_bank_account" );
+        long initialCount = collection.countDocuments(eq("deleted", false));
         // creating entity
         String entityId = given()
                 .cookies( cookies )
@@ -164,12 +147,12 @@ public class BankAccountTest extends BaseTest {
                 .log().body()
                 .statusCode( 201 )
                 .extract().jsonPath().getString( "id" );
-
-        collection = database.getCollection("school_bank_account");
-        long CreationCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
-
+        // get the document count again
+        collection = database.getCollection( "school_bank_account" );
+        long afterCreationCount = collection.countDocuments(eq("deleted", false));
+        // compare that the document count increased by 1
+        Assert.assertEquals( afterCreationCount - 1, initialCount );
+        Assert.assertEquals( initialCount + 1 ,  afterCreationCount);
 
         // entity creation negative test
         given()
@@ -181,14 +164,12 @@ public class BankAccountTest extends BaseTest {
                 .post( apiPath )
                 .then()
                 .log().body()
-                .statusCode( 400 )
-        ;
+                .statusCode( 400 );
 
-        collection = database.getCollection("school_bank_account");
-        long afterNegativeCreationCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
-        Assert.assertEquals(afterNegativeCreationCount ,CreationCount);
+        //test that count didn't increase
+        collection = database.getCollection( "school_bank_account" );
+        long afterNegativeCreationCount = collection.countDocuments(eq("deleted", false));
+        Assert.assertEquals( afterNegativeCreationCount, afterCreationCount );
 
         // deleting entity
         given()
@@ -201,12 +182,10 @@ public class BankAccountTest extends BaseTest {
                 .statusCode( 200 )
         ;
 
-        collection = database.getCollection("school_bank_account");
-        long afterDeletingNegativeCreationCount = collection.countDocuments();
-        System.out.println(collection.countDocuments());
-
-        Assert.assertEquals(DefaultCount-1 ,afterDeletingNegativeCreationCount);
-
+        // test that count decrease by 1
+        collection = database.getCollection( "school_bank_account" );
+        long afterDeletionCount = collection.countDocuments(eq("deleted", false));
+        Assert.assertEquals( afterDeletionCount, afterCreationCount - 1 );
 
     }
 
@@ -227,6 +206,8 @@ public class BankAccountTest extends BaseTest {
                 .statusCode( 201 )
                 .extract().jsonPath().getString( "id" );
 
+
+
         // deleting entity
         given()
                 .cookies( cookies )
@@ -238,6 +219,10 @@ public class BankAccountTest extends BaseTest {
                 .statusCode( 200 )
         ;
 
+        collection = database.getCollection( "school_bank_account" );
+        long DefaultCount = collection.countDocuments(eq("deleted", false));
+        System.out.println(DefaultCount);
+
         // deleting entity again
         given()
                 .cookies( cookies )
@@ -246,13 +231,17 @@ public class BankAccountTest extends BaseTest {
                 .delete( apiPath + "/" + entityId )
                 .then()
                 .log().body()
-                .statusCode( 404 )
+                .statusCode( 200 )
         ;
 
+        collection = database.getCollection( "school_bank_account" );
+        long AfterDeleteCount = collection.countDocuments(eq("deleted", false));
+        System.out.println(AfterDeleteCount);
+        Assert.assertEquals( DefaultCount, AfterDeleteCount );
     }
 
     private Document getEntityById(String entityId) {
-        collection = database.getCollection( "school_bank_account" );
+        MongoCollection<Document> collection = database.getCollection( "school_bank_account" );
         return collection.find(
                 new Document( "_id", new ObjectId( entityId ) )
         ).first();
